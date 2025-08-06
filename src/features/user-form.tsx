@@ -17,14 +17,14 @@ const UserFormModal: React.FC<{
           name: user.name,
           email: user.email,
           role: user.role,
-          status: user.status
+          status: user.status,
         })
       } else {
         form.setFieldsValue({
           name: '',
           email: '',
           role: 'user',
-          status: 'active'
+          status: 'active',
         })
       }
     }
@@ -56,7 +56,7 @@ const UserFormModal: React.FC<{
           onClick={handleSubmit}
         >
           {user ? 'Update' : 'Create'}
-        </Button>
+        </Button>,
       ]}
       width={500}
     >
@@ -66,7 +66,7 @@ const UserFormModal: React.FC<{
           label='Name'
           rules={[
             { required: true, message: 'Please enter the name' },
-            { min: 2, message: 'Name must be at least 2 characters' }
+            { min: 2, message: 'Name must be at least 2 characters' },
           ]}
         >
           <Input placeholder='Enter user name' />
@@ -77,7 +77,7 @@ const UserFormModal: React.FC<{
           label='Email'
           rules={[
             { required: true, message: 'Please enter the email' },
-            { type: 'email', message: 'Please enter a valid email' }
+            { type: 'email', message: 'Please enter a valid email' },
           ]}
         >
           <Input placeholder='Enter email address' />
