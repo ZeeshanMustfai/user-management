@@ -1,103 +1,448 @@
-import Image from "next/image";
+'use client'
+import React, { useState, useEffect, useMemo, useCallback } from 'react'
+import {
+  Modal,
+  Select,
+  Button,
+  Space,
+  Tag,
+  Tooltip,
+  notification,
+  ConfigProvider,
+  theme,
+  Switch,
+  Card,
+  App
+} from 'antd'
+import {
+  EditOutlined,
+  DeleteOutlined,
+  PlusOutlined,
+  UserOutlined,
+  CrownOutlined,
+  SafetyOutlined,
+  MoonOutlined,
+  SunOutlined
+} from '@ant-design/icons'
+import { AgGridReact } from 'ag-grid-react'
+import { ModuleRegistry, AllCommunityModule } from 'ag-grid-community'
+ModuleRegistry.registerModules([AllCommunityModule])
+// import 'ag-grid-community/styles/ag-grid.css'
+// import 'ag-grid-community/styles/ag-theme-alpine.css'
+import { User, UserFormData } from '@/types'
+import { useUserStore } from '@/store'
+import { mockAPI } from '@/mock'
+import UserFormModal from '@/modals/user-form-modal'
 
-export default function Home() {
-  return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+const StatusRenderer = ({ value }: { value: string }) => {
+  const statusConfig = {
+    active: { color: 'green', text: 'Active' },
+    banned: { color: 'red', text: 'Banned' },
+    pending: { color: 'orange', text: 'Pending' }
+  }
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
-  );
+  const config =
+    statusConfig[value as keyof typeof statusConfig] || statusConfig.pending
+  return <Tag color={config.color}>{config.text}</Tag>
 }
+
+const DateRenderer = ({ value }: { value: string }) => {
+  if (!value) return null
+
+  const date = new Date(value)
+  const formatted = new Intl.DateTimeFormat('en-GB', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  }).format(date)
+
+  return (
+    <Tooltip title={date.toISOString()}>
+      <span>{formatted}</span>
+    </Tooltip>
+  )
+}
+
+const RoleRenderer = ({ value, data }: any) => {
+  const { updateUser } = useUserStore()
+
+  const roleConfig = {
+    admin: {
+      icon: <CrownOutlined style={{ color: '#faad14' }} />,
+      label: 'Admin'
+    },
+    moderator: {
+      icon: <SafetyOutlined style={{ color: '#1890ff' }} />,
+      label: 'Moderator'
+    },
+    user: { icon: <UserOutlined style={{ color: '#52c41a' }} />, label: 'User' }
+  }
+
+  const handleRoleChange = async (newRole: string) => {
+    try {
+      await mockAPI.updateUser(data.id, { role: newRole as any })
+      updateUser(data.id, { role: newRole as any })
+      notification.success({
+        message: 'Role Updated',
+        description: `User role changed to ${newRole}`,
+        duration: 2
+      })
+    } catch (error) {
+      notification.error({
+        message: 'Update Failed',
+        description: 'Failed to update user role'
+      })
+    }
+  }
+
+  const config = roleConfig[value as keyof typeof roleConfig]
+
+  return (
+    <Space>
+      {config?.icon}
+      <Select
+        value={value}
+        size='small'
+        style={{ width: 100 }}
+        onChange={handleRoleChange}
+      >
+        <Select.Option value='admin'>Admin</Select.Option>
+        <Select.Option value='moderator'>Moderator</Select.Option>
+        <Select.Option value='user'>User</Select.Option>
+      </Select>
+    </Space>
+  )
+}
+
+const ActionsRenderer = ({ data, context }: any) => {
+  return (
+    <Space>
+      <Button
+        type='text'
+        size='small'
+        icon={<EditOutlined />}
+        onClick={() => context.onEdit(data)}
+      />
+      <Button
+        type='text'
+        size='small'
+        danger
+        icon={<DeleteOutlined />}
+        onClick={() => context.onDelete(data.id)}
+      />
+    </Space>
+  )
+}
+
+// Main Application Component
+const UserManagementApp: React.FC = () => {
+  const {
+    users,
+    loading,
+    setUsers,
+    addUser,
+    updateUser,
+    deleteUser,
+    setLoading
+  } = useUserStore()
+  const [modalOpen, setModalOpen] = useState(false)
+  const [editingUser, setEditingUser] = useState<User | undefined>()
+  const [formLoading, setFormLoading] = useState(false)
+  const [isDarkMode, setIsDarkMode] = useState(false)
+
+  useEffect(() => {
+    const loadUsers = async () => {
+      setLoading(true)
+      try {
+        const userData = await mockAPI.fetchUsers()
+        setUsers(userData)
+      } catch (error) {
+        notification.error({
+          message: 'Failed to load users',
+          description: 'Please try refreshing the page'
+        })
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadUsers()
+  }, [setUsers, setLoading])
+
+  // Event handlers
+  const handleEdit = useCallback((user: User) => {
+    setEditingUser(user)
+    setModalOpen(true)
+  }, [])
+
+  const handleDelete = useCallback(
+    (userId: string) => {
+      Modal.confirm({
+        title: 'Delete User',
+        content:
+          'Are you sure you want to delete this user? This action cannot be undone.',
+        okText: 'Delete',
+        okType: 'danger',
+        cancelText: 'Cancel',
+        onOk: async () => {
+          try {
+            await mockAPI.deleteUser(userId)
+            deleteUser(userId)
+            notification.success({
+              message: 'User Deleted',
+              description: 'User has been successfully deleted',
+              duration: 3
+            })
+          } catch (error) {
+            notification.error({
+              message: 'Delete Failed',
+              description: 'Failed to delete user'
+            })
+          }
+        }
+      })
+    },
+    [deleteUser]
+  )
+
+  const handleAddUser = useCallback(() => {
+    setEditingUser(undefined)
+    setModalOpen(true)
+  }, [])
+
+  const handleSaveUser = useCallback(
+    async (userData: UserFormData) => {
+      setFormLoading(true)
+      try {
+        if (editingUser) {
+          const updatedUser = await mockAPI.updateUser(editingUser.id, userData)
+          updateUser(editingUser.id, updatedUser)
+          notification.success({
+            message: 'User Updated',
+            description: 'User has been successfully updated',
+            duration: 3
+          })
+        } else {
+          const newUser = await mockAPI.createUser(userData)
+          addUser(newUser)
+          notification.success({
+            message: 'User Added',
+            description: 'New user has been successfully added',
+            duration: 3
+          })
+        }
+        setModalOpen(false)
+        setEditingUser(undefined)
+      } catch (error) {
+        notification.error({
+          message: 'Save Failed',
+          description: 'Failed to save user data'
+        })
+      } finally {
+        setFormLoading(false)
+      }
+    },
+    [editingUser, addUser, updateUser]
+  )
+
+  const handleModalCancel = useCallback(() => {
+    setModalOpen(false)
+    setEditingUser(undefined)
+  }, [])
+
+  // Column definitions for AG Grid
+  const columnDefs = useMemo(
+    () => [
+      {
+        headerName: 'ID',
+        field: 'id',
+        width: 80,
+        pinned: 'left',
+        sortable: false,
+        filter: false
+      },
+      {
+        headerName: 'Name',
+        field: 'name',
+        width: 150,
+        sortable: true,
+        filter: true,
+        filterParams: {
+          filterOptions: ['contains', 'startsWith', 'endsWith'],
+          suppressAndOrCondition: true
+        }
+      },
+      {
+        headerName: 'Email',
+        field: 'email',
+        width: 200,
+        sortable: true,
+        filter: true,
+        filterParams: {
+          filterOptions: ['contains', 'startsWith', 'endsWith'],
+          suppressAndOrCondition: true
+        }
+      },
+      {
+        headerName: 'Role',
+        field: 'role',
+        width: 160,
+        cellRenderer: RoleRenderer,
+        filter: true,
+        filterParams: {
+          filterOptions: ['equals'],
+          suppressAndOrCondition: true
+        }
+      },
+      {
+        headerName: 'Status',
+        field: 'status',
+        width: 120,
+        cellRenderer: StatusRenderer,
+        filter: true,
+        filterParams: {
+          filterOptions: ['equals'],
+          suppressAndOrCondition: true
+        }
+      },
+      {
+        headerName: 'Creation Date',
+        field: 'creationDate',
+        width: 180,
+        sortable: true,
+        cellRenderer: DateRenderer,
+        sort: 'desc'
+      },
+      {
+        headerName: 'Actions',
+        width: 120,
+        pinned: 'right',
+        cellRenderer: ActionsRenderer,
+        sortable: false,
+        filter: false,
+        resizable: false
+      }
+    ],
+    []
+  )
+
+  const defaultColDef = useMemo(
+    () => ({
+      resizable: true,
+      sortable: false,
+      filter: false,
+      floatingFilter: false
+    }),
+    []
+  )
+
+  const gridContext = useMemo(
+    () => ({
+      onEdit: handleEdit,
+      onDelete: handleDelete
+    }),
+    [handleEdit, handleDelete]
+  )
+
+  const showConfirm = () => {
+    Modal.confirm({
+      title: 'Delete User',
+      content: 'Are you sure you want to delete this user?',
+      okText: 'Delete',
+      okType: 'danger',
+      cancelText: 'Cancel',
+      onOk: async () => {
+        notification.success({
+          message: 'User Deleted',
+          description: 'User has been successfully deleted',
+          duration: 3
+        })
+      },
+      onCancel: () => {
+        console.log('Cancelled')
+      }
+    })
+  }
+
+  return (
+    <div
+      style={{
+        padding: '24px',
+        minHeight: '100vh',
+        backgroundColor: isDarkMode ? '#141414' : '#f5f5f5'
+      }}
+    >
+      {/* Header */}
+      <Card style={{ marginBottom: '24px' }}>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center'
+          }}
+        >
+          <h1 style={{ margin: 0, fontSize: '28px', fontWeight: 600 }}>
+            User Management System
+          </h1>
+          <Space size='middle'>
+            <Switch
+              checked={isDarkMode}
+              onChange={setIsDarkMode}
+              checkedChildren={<MoonOutlined />}
+              unCheckedChildren={<SunOutlined />}
+            />
+            <Button
+              type='primary'
+              icon={<PlusOutlined />}
+              onClick={handleAddUser}
+              size='large'
+            >
+              Add User
+            </Button>
+          </Space>
+        </div>
+      </Card>
+
+      <Button onClick={showConfirm}>show</Button>
+
+      {/* Data Grid */}
+      <Card>
+        <div
+          // className={isDarkMode ? 'ag-theme-alpine-dark' : 'ag-theme-alpine'}
+          style={{ height: '600px', width: '100%' }}
+        >
+          <AgGridReact
+            theme='legacy'
+            className='ag-theme-alpine'
+            rowData={users}
+            columnDefs={columnDefs}
+            defaultColDef={defaultColDef}
+            pagination={true}
+            paginationPageSize={10}
+            paginationPageSizeSelector={[10, 20, 50]}
+            loading={loading}
+            animateRows={true}
+            rowSelection='single'
+            suppressRowClickSelection={true}
+            context={gridContext}
+            rowHeight={50}
+            headerHeight={50}
+          />
+        </div>
+      </Card>
+
+      {/* User Form Modal */}
+      <UserFormModal
+        open={modalOpen}
+        onCancel={handleModalCancel}
+        onSave={handleSaveUser}
+        user={editingUser}
+        loading={formLoading}
+      />
+    </div>
+  )
+}
+
+export default UserManagementApp
