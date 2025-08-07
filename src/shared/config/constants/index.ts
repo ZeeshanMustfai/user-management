@@ -1,4 +1,4 @@
-import { User, UserFormData } from '@/types'
+import { User } from '@/types'
 
 export const mockUsersStore: User[] = [
   {

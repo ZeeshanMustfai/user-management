@@ -2,27 +2,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client'
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
-import {
-  Modal,
-  Select,
-  Button,
-  Space,
-  Tag,
-  Tooltip,
-  notification,
-  Switch,
-  Card,
-} from 'antd'
-import {
-  EditOutlined,
-  DeleteOutlined,
-  PlusOutlined,
-  UserOutlined,
-  CrownOutlined,
-  SafetyOutlined,
-  MoonOutlined,
-  SunOutlined,
-} from '@ant-design/icons'
+import { Button, Space, notification, Switch, Card } from 'antd'
+import { PlusOutlined, MoonOutlined, SunOutlined } from '@ant-design/icons'
 import { AgGridReact } from 'ag-grid-react'
 import { ModuleRegistry, AllCommunityModule } from 'ag-grid-community'
 ModuleRegistry.registerModules([AllCommunityModule])
@@ -31,113 +12,14 @@ import { useUserStore } from '@/store'
 import { useNotification } from '@/shared/lib/hooks/use-notification'
 import UserFormModal from '@/features/user-form'
 import { mockAPI } from '@/shared/lib/utils'
+import { DeleteUserModal } from '@/features/user-delete'
+import {
+  ActionsRenderer,
+  DateRenderer,
+  RoleRenderer,
+  StatusRenderer,
+} from '@/shared/ui/table'
 
-const StatusRenderer = ({ value }: { value: string }) => {
-  const statusConfig = {
-    active: { color: 'green', text: 'Active' },
-    banned: { color: 'red', text: 'Banned' },
-    pending: { color: 'orange', text: 'Pending' },
-  }
-
-  const config =
-    statusConfig[value as keyof typeof statusConfig] || statusConfig.pending
-  return <Tag color={config.color}>{config.text}</Tag>
-}
-
-const DateRenderer = ({ value }: { value: string }) => {
-  if (!value) return null
-
-  const date = new Date(value)
-  const formatted = new Intl.DateTimeFormat('en-GB', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date)
-
-  return (
-    <Tooltip title={date.toISOString()}>
-      <span>{formatted}</span>
-    </Tooltip>
-  )
-}
-
-const RoleRenderer = ({ value, data }: any) => {
-  const { updateUser } = useUserStore()
-
-  const roleConfig = {
-    admin: {
-      icon: <CrownOutlined style={{ color: '#faad14' }} />,
-      label: 'Admin',
-    },
-    moderator: {
-      icon: <SafetyOutlined style={{ color: '#1890ff' }} />,
-      label: 'Moderator',
-    },
-    user: {
-      icon: <UserOutlined style={{ color: '#52c41a' }} />,
-      label: 'User',
-    },
-  }
-
-  const handleRoleChange = async (newRole: string) => {
-    try {
-      await mockAPI.updateUser(data.id, { role: newRole as any })
-      updateUser(data.id, { role: newRole as any })
-      notification.success({
-        message: 'Role Updated',
-        description: `User role changed to ${newRole}`,
-        duration: 2,
-      })
-    } catch (error) {
-      notification.error({
-        message: 'Update Failed',
-        description: 'Failed to update user role',
-      })
-    }
-  }
-
-  const config = roleConfig[value as keyof typeof roleConfig]
-
-  return (
-    <Space>
-      {config?.icon}
-      <Select
-        value={value}
-        size='small'
-        style={{ width: 100 }}
-        onChange={handleRoleChange}
-      >
-        <Select.Option value='admin'>Admin</Select.Option>
-        <Select.Option value='moderator'>Moderator</Select.Option>
-        <Select.Option value='user'>User</Select.Option>
-      </Select>
-    </Space>
-  )
-}
-
-const ActionsRenderer = ({ data, context }: any) => {
-  return (
-    <Space>
-      <Button
-        type='text'
-        size='small'
-        icon={<EditOutlined />}
-        onClick={() => context.onEdit(data)}
-      />
-      <Button
-        type='text'
-        size='small'
-        danger
-        icon={<DeleteOutlined />}
-        onClick={() => context.onDelete(data.id)}
-      />
-    </Space>
-  )
-}
-
-// Main Application Component
 const UserManagemet: React.FC = () => {
   const {
     users,
@@ -152,6 +34,9 @@ const UserManagemet: React.FC = () => {
   const [editingUser, setEditingUser] = useState<User | undefined>()
   const [formLoading, setFormLoading] = useState(false)
   const [isDarkMode, setIsDarkMode] = useState(false)
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false)
+  const [deletingUserId, setDeletingUserId] = useState<string | null>(null)
+  const [deleteLoading, setDeleteLoading] = useState(false)
   const { showSuccess } = useNotification()
 
   useEffect(() => {
@@ -182,30 +67,32 @@ const UserManagemet: React.FC = () => {
 
   const handleDelete = useCallback(
     (userId: string) => {
-      Modal.confirm({
-        title: 'Delete User',
-        content:
-          'Are you sure you want to delete this user? This action cannot be undone.',
-        okText: 'Delete',
-        okType: 'danger',
-        cancelText: 'Cancel',
-        onOk: async () => {
-          try {
-            await mockAPI.deleteUser(userId)
-            deleteUser(userId)
-            notification.success({
-              message: 'User Deleted',
-              description: 'User has been successfully deleted',
-              duration: 3,
-            })
-          } catch (error) {
-            notification.error({
-              message: 'Delete Failed',
-              description: 'Failed to delete user',
-            })
-          }
-        },
-      })
+      setDeletingUserId(userId)
+      setDeleteModalVisible(true)
+      // Modal.confirm({
+      //   title: 'Delete User',
+      //   content:
+      //     'Are you sure you want to delete this user? This action cannot be undone.',
+      //   okText: 'Delete',
+      //   okType: 'danger',
+      //   cancelText: 'Cancel',
+      //   onOk: async () => {
+      //     try {
+      //       await mockAPI.deleteUser(userId)
+      //       deleteUser(userId)
+      //       notification.success({
+      //         message: 'User Deleted',
+      //         description: 'User has been successfully deleted',
+      //         duration: 3,
+      //       })
+      //     } catch (error) {
+      //       notification.error({
+      //         message: 'Delete Failed',
+      //         description: 'Failed to delete user',
+      //       })
+      //     }
+      //   },
+      // })
     },
     [deleteUser]
   )
@@ -350,15 +237,50 @@ const UserManagemet: React.FC = () => {
     [handleEdit, handleDelete]
   )
 
+  const handleDeleteConfirm = async () => {
+    if (!deletingUserId) return
+
+    setDeleteLoading(true)
+    try {
+      await mockAPI.deleteUser(deletingUserId)
+      deleteUser(deletingUserId)
+      notification.success({
+        message: 'User Deleted',
+        description: 'User has been successfully deleted',
+        duration: 3,
+      })
+      setDeleteModalVisible(false)
+    } catch (error) {
+      notification.error({
+        message: 'Delete Failed',
+        description: 'Failed to delete user',
+      })
+    } finally {
+      setDeleteLoading(false)
+      setDeletingUserId(null)
+    }
+  }
+
+  const handleDeleteCancel = () => {
+    setDeleteModalVisible(false)
+    setDeletingUserId(null)
+  }
+
+  const themeStyle = {
+    marginBottom: '24px',
+    backgroundColor: isDarkMode ? '#141414' : '',
+    color: isDarkMode ? '#ffffff' : '#000000',
+  }
+
   return (
     <div
       style={{
         padding: '24px',
         minHeight: '100vh',
-        backgroundColor: isDarkMode ? '#141414' : '#f5f5f5',
+        backgroundColor: isDarkMode ? '#141414' : '',
       }}
     >
-      <Card style={{ marginBottom: '24px' }}>
+      <Card style={themeStyle}>
         <div
           style={{
             display: 'flex',
@@ -388,11 +310,14 @@ const UserManagemet: React.FC = () => {
         </div>
       </Card>
 
-      <Card>
-        <div style={{ width: '100%', height: '500px' }}>
+      <Card style={themeStyle}>
+        <div
+          style={{ width: '100%', height: '500px' }}
+          className={isDarkMode ? 'ag-theme-alpine-dark' : 'ag-theme-alpine'}
+        >
           <AgGridReact
             theme='legacy'
-            className='ag-theme-alpine'
+            className={isDarkMode ? 'ag-theme-alpine-dark' : 'ag-theme-alpine'}
             rowData={users}
             columnDefs={columnDefs}
             defaultColDef={defaultColDef}
@@ -410,6 +335,16 @@ const UserManagemet: React.FC = () => {
           />
         </div>
       </Card>
+
+      {deleteModalVisible && (
+        <DeleteUserModal
+          visible={deleteModalVisible}
+          onCancel={handleDeleteCancel}
+          onConfirm={handleDeleteConfirm}
+          userName=''
+          loading={deleteLoading}
+        />
+      )}
 
       <UserFormModal
         open={modalOpen}
